@@ -14,6 +14,10 @@ from pathlib import Path
 IMAGE_EXTENSIONS = frozenset({".tif",".tiff",".png",".jpg",".jpeg",".bmp"})
 
 SAT_THRESHOLD:float = 0.2
+# Minimum HSV value (brightness, 0-1). Saturation is scale-free, so near-black pixels
+# (e.g. RGB = 0,1,0) have S = 1 and pass the saturation test, but their hue is pure
+# quantisation noise. 0.05 = 13/255 for 8-bit images.
+VAL_THRESHOLD:float = 0.05
 
 def _sort_key(s: str)->list:
     """breaks filename into list of chunks of alphabets and numbers"""
@@ -32,15 +36,17 @@ def find_images(folder: str) -> list[str]:
     paths = [str(f) for f in base.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS]
     return sorted(paths, key=_sort_key)
 
-def load_image(path: str) -> np.ndarray | None:
+def load_image(path: str) -> np.ndarray:
     """loads image as BGR or BGRA unchanged"""
     img = cv2.imread(str(path),cv2.IMREAD_UNCHANGED)
     if img is None:
         raise FileNotFoundError(f"{path} image could not be loaded")
     return img
 
-def image_to_hue_field(img: np.ndarray, sat_threshold: float = SAT_THRESHOLD) -> np.ndarray:
-    """extracts hue only from HSV of images, NaN where saturation is below threshold or pixel is transparent"""
+def image_to_hue_field(img: np.ndarray, sat_threshold: float = SAT_THRESHOLD, val_threshold: float = VAL_THRESHOLD) -> np.ndarray:
+    """extracts hue (degrees) from HSV of images.
+    NaN where saturation < sat_threshold, value (brightness) < val_threshold, or pixel is transparent.
+    Set val_threshold=0 to reproduce the old behaviour."""
     if img.ndim < 3:
         raise ValueError("Found Grayscale image! Expected: color image")
 
@@ -57,8 +63,9 @@ def image_to_hue_field(img: np.ndarray, sat_threshold: float = SAT_THRESHOLD) ->
     hsv = cv2.cvtColor(bgr_float, cv2.COLOR_BGR2HSV)
     hue = hsv[:, :, 0]
     sat = hsv[:, :, 1]
+    val = hsv[:, :, 2]
 
-    invalid = sat < sat_threshold
+    invalid = (sat < sat_threshold) | (val < val_threshold)
     if alpha_mask is not None:
         invalid = invalid | alpha_mask
 

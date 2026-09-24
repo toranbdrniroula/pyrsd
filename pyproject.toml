@@ -12,7 +12,9 @@ dependencies = [
 
 [project.optional-dependencies]
 abel = ["PyAbel"]
-denoising = ["sickit-image","bm3d"]
+denoising = ["scikit-image","bm3d"]
+hdf5 = ["h5py"]
+dev = ["pytest"]
 
 [build-system]
 requires = ["setuptools","wheel"]

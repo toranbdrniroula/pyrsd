@@ -15,6 +15,15 @@ def hue_to_displacement(hue_field: np.ndarray, spline) -> np.ndarray:
         disp[valid] = spline(hue_field[valid])
     return disp
 
+def plateau_mask(hue_field: np.ndarray, spline, tol_deg: float = 0.5) -> np.ndarray:
+    """True where a pixel's hue lies on the calibration's saturation plateau, i.e. its displacement is only
+    known to +/- spline.plateau_halfwidth_mm. All False if the calibration has no plateau."""
+    ph = getattr(spline, "plateau_hue", None)
+    if ph is None:
+        return np.zeros(hue_field.shape, dtype=bool)
+    with np.errstate(invalid="ignore"):
+        return np.abs(hue_field - ph) <= tol_deg
+
 def compute_delta_displacement(flow_hue: np.ndarray, bg_hue: np.ndarray, spline) -> np.ndarray:
     """returns delta displacement when flow hue and background hue field are given with calibration spline"""
     return (hue_to_displacement(flow_hue,spline)-hue_to_displacement(bg_hue,spline))
